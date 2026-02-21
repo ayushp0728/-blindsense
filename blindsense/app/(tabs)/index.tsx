@@ -1,98 +1,112 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from "react";
+import { View, Text, Button, StyleSheet } from "react-native";
+import { requireNativeModule } from "expo-modules-core";
+import { requireNativeViewManager } from "expo-modules-core";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+
+const AnchorModule = requireNativeModule("AnchorModule");
+const AnchorView = requireNativeViewManager("AnchorModule");
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Amrik is a chud</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const [vector, setVector] = useState<any>(null);
+  const [sessionStarted, setSessionStarted] = useState(false);
+
+  useEffect(() => {
+    let interval: any;
+
+    if (sessionStarted) {
+      interval = setInterval(async () => {
+        const v = await AnchorModule.getVectorToAnchor();
+        setVector(v);
+      }, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [sessionStarted]);
+
+  const startSession = async () => {
+    await AnchorModule.startSession();
+    setSessionStarted(true);
+    console.log("SESSION STARTED");
+  };
+
+  const stopSession = async () => {
+    await AnchorModule.stopSession();
+    setSessionStarted(false);
+    setVector(null);
+    console.log("SESSION STOPPED");
+  };
+
+  const saveAnchor = async () => {
+    await AnchorModule.saveAnchor();
+    console.log("ANCHOR SAVED");
+  };
+
+  // Convert heading delta to simple instruction
+  const getTurnInstruction = (delta: number) => {
+    if (Math.abs(delta) < 10) return "Facing correct direction";
+    if (delta > 0) return `Turn RIGHT ${delta.toFixed(0)}°`;
+    return `Turn LEFT ${Math.abs(delta).toFixed(0)}°`;
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Anchor Navigation Test</Text>
+
+      <Button title="Start Session" onPress={startSession} />
+      <Button title="Save Anchor Here" onPress={saveAnchor} />
+      <Button title="Stop Session" onPress={stopSession} />
+
+      {vector && (
+        <View style={styles.vectorBox}>
+          <AnchorView style={{ flex: 1 }} />
+
+          <View style={styles.overlay}>
+            {/* Your buttons & vector UI */}
+          </View>
+          <Text>Distance: {vector.distance?.toFixed(2)} m</Text>
+
+          <Text>dx: {vector.dx?.toFixed(2)}</Text>
+          <Text>dy: {vector.dy?.toFixed(2)}</Text>
+          <Text>dz: {vector.dz?.toFixed(2)}</Text>
+
+          <Text>Current Heading: {vector.currentHeading?.toFixed(0)}°</Text>
+          <Text>Anchor Heading: {vector.anchorHeading?.toFixed(0)}°</Text>
+          <Text>Heading Delta: {vector.headingDelta?.toFixed(0)}°</Text>
+
+          <Text style={{ marginTop: 10, fontWeight: "bold" }}>
+            {getTurnInstruction(vector.headingDelta)}
+          </Text>
+
+          
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 22,
+    marginBottom: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  vectorBox: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#eee",
   },
+  overlay: {
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 16,
+    borderRadius: 12
+  }
 });
