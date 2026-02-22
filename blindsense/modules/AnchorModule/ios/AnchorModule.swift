@@ -132,25 +132,64 @@ public class AnchorModule: Module {
     AsyncFunction("getVectorToAnchor") { () -> [String: Any]? in
       guard isRunning,
             let frame = self.session.currentFrame,
-            let anchor = self.savedAnchorPosition,
+            let anchorPos = self.savedAnchorPosition,
             let anchorHeading = self.savedAnchorHeading else { return nil }
 
-      let camT = frame.camera.transform
-      let camPos = SIMD3<Float>(camT.columns.3.x, camT.columns.3.y, camT.columns.3.z)
+      let cameraTransform = frame.camera.transform
+      
+      // 1. World Delta
+      let camWorldPos = SIMD3<Float>(cameraTransform.columns.3.x, 
+                                    cameraTransform.columns.3.y, 
+                                    cameraTransform.columns.3.z)
+      let worldDelta = anchorPos - camWorldPos
+      let distance = simd_length(worldDelta)
 
-      let delta = anchor - camPos
-      let distance = simd_length(delta)
-      let currentHeading = self.headingManager.currentHeading
-      let deltaHeading = normalizeAngle(anchorHeading - currentHeading)
+      // 2. Extract Rotation and Transpose (Inverse) Inline
+      // We take the top-left 3x3 of the 4x4 matrix
+      let rotationMatrix = simd_float3x3(
+        SIMD3<Float>(cameraTransform.columns.0.x, cameraTransform.columns.0.y, cameraTransform.columns.0.z),
+        SIMD3<Float>(cameraTransform.columns.1.x, cameraTransform.columns.1.y, cameraTransform.columns.1.z),
+        SIMD3<Float>(cameraTransform.columns.2.x, cameraTransform.columns.2.y, cameraTransform.columns.2.z)
+      )
+      let cameraRotationInverse = rotationMatrix.transpose
+
+      // 3. Local Delta (relative to phone orientation)
+      let localDelta = cameraRotationInverse * worldDelta
+
+      // 4. Directional Logic
+      var directionInstruction = "STAY"
+      
+      // Thresholds for better UX
+      let distanceThreshold: Float = 0.6 // 60cm
+      let alignmentThreshold: Double = 15.0 // 15 degrees
+
+      if distance > distanceThreshold {
+        // Basic navigation based on Local Z (Forward/Back)
+        // In ARKit, -Z is the direction the camera is pointing
+        if localDelta.z < 0 {
+          directionInstruction = "FORWARD"
+        } else {
+          directionInstruction = "BACKWARD"
+        }
+      } else {
+        // AT ANCHOR: Point user to the original compass heading
+        let currentHeading = self.headingManager.currentHeading
+        let headingError = normalizeAngle(anchorHeading - currentHeading)
+        
+        if abs(headingError) < alignmentThreshold {
+          directionInstruction = "ARRIVED_AND_ALIGNED"
+        } else {
+          directionInstruction = headingError > 0 ? "LOOK_RIGHT" : "LOOK_LEFT"
+        }
+      }
 
       return [
-        "dx": Double(delta.x),
-        "dy": Double(delta.y),
-        "dz": Double(delta.z),
+        "localX": Double(localDelta.x),
+        "localY": Double(localDelta.y),
+        "localZ": Double(localDelta.z),
         "distance": Double(distance),
-        "currentHeading": currentHeading,
-        "anchorHeading": anchorHeading,
-        "headingDelta": deltaHeading
+        "instruction": directionInstruction,
+        "headingDelta": normalizeAngle(anchorHeading - self.headingManager.currentHeading)
       ]
     }
   }
