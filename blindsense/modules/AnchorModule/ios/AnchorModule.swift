@@ -2,9 +2,8 @@ import ExpoModulesCore
 import ARKit
 import simd
 import CoreLocation
-import UIKit
 
-// MARK: - Heading Manager
+// MARK: - Heading Manager (NSObject)
 
 class HeadingManager: NSObject, CLLocationManagerDelegate {
 
@@ -31,40 +30,9 @@ class HeadingManager: NSObject, CLLocationManagerDelegate {
   }
 }
 
-// MARK: - AR Camera View
-
-class ARCameraView: UIView {
-
-  private let arView = ARSCNView(frame: .zero)
-
-  override init(frame: CGRect) {
-    super.init(frame: frame)
-    setup()
-  }
-
-  required init?(coder: NSCoder) {
-    super.init(coder: coder)
-    setup()
-  }
-
-  private func setup() {
-    arView.frame = bounds
-    arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    addSubview(arView)
-
-    // Attach global session
-    if let session = AnchorModule.sharedSession {
-      arView.session = session
-    }
-  }
-}
-
 // MARK: - Expo Module
 
 public class AnchorModule: Module {
-
-  // 🔹 Global shared session
-  static var sharedSession: ARSession?
 
   private let session = ARSession()
   private var isRunning = false
@@ -78,9 +46,6 @@ public class AnchorModule: Module {
 
     Name("AnchorModule")
 
-    // Expose native AR camera view
-    View(ARCameraView.self)
-
     Function("ping") {
       return "AnchorModule alive"
     }
@@ -93,23 +58,20 @@ public class AnchorModule: Module {
       let config = ARWorldTrackingConfiguration()
       config.worldAlignment = .gravity
 
-      self.session.run(config, options: [.resetTracking, .removeExistingAnchors])
-      self.isRunning = true
-
-      // Store globally so views can access
-      AnchorModule.sharedSession = self.session
+      session.run(config, options: [.resetTracking, .removeExistingAnchors])
+      isRunning = true
     }
 
     AsyncFunction("stopSession") { () -> Void in
-      self.session.pause()
-      self.isRunning = false
-      self.savedAnchorPosition = nil
-      self.savedAnchorHeading = nil
+      session.pause()
+      isRunning = false
+      savedAnchorPosition = nil
+      savedAnchorHeading = nil
     }
 
     AsyncFunction("saveAnchor") { () -> Void in
       guard
-        self.isRunning,
+        isRunning,
         let frame = self.session.currentFrame
       else {
         throw NSError(domain: "AnchorModule", code: 2)
@@ -123,13 +85,13 @@ public class AnchorModule: Module {
       )
 
       self.savedAnchorPosition = pos
-      self.savedAnchorHeading = self.headingManager.currentHeading
+      self.savedAnchorHeading = headingManager.currentHeading
     }
 
     AsyncFunction("getVectorToAnchor") { () -> [String: Any]? in
 
       guard
-        self.isRunning,
+        isRunning,
         let frame = self.session.currentFrame,
         let anchor = self.savedAnchorPosition,
         let anchorHeading = self.savedAnchorHeading
@@ -147,7 +109,7 @@ public class AnchorModule: Module {
       let delta = anchor - camPos
       let distance = simd_length(delta)
 
-      let currentHeading = self.headingManager.currentHeading
+      let currentHeading = headingManager.currentHeading
       let deltaHeading = normalizeAngle(anchorHeading - currentHeading)
 
       return [

@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import { View, Text, Button, StyleSheet } from "react-native";
 import { requireNativeModule } from "expo-modules-core";
-import { requireNativeViewManager } from "expo-modules-core";
-
 
 const AnchorModule = requireNativeModule("AnchorModule");
-const AnchorView = requireNativeViewManager("AnchorModule");
 
 export default function HomeScreen() {
 
@@ -60,11 +57,6 @@ export default function HomeScreen() {
 
       {vector && (
         <View style={styles.vectorBox}>
-          <AnchorView style={{ flex: 1 }} />
-
-          <View style={styles.overlay}>
-            {/* Your buttons & vector UI */}
-          </View>
           <Text>Distance: {vector.distance?.toFixed(2)} m</Text>
 
           <Text>dx: {vector.dx?.toFixed(2)}</Text>
@@ -78,8 +70,6 @@ export default function HomeScreen() {
           <Text style={{ marginTop: 10, fontWeight: "bold" }}>
             {getTurnInstruction(vector.headingDelta)}
           </Text>
-
-          
         </View>
       )}
     </View>
@@ -101,12 +91,4 @@ const styles = StyleSheet.create({
     padding: 15,
     backgroundColor: "#eee",
   },
-  overlay: {
-    position: "absolute",
-    bottom: 40,
-    alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    padding: 16,
-    borderRadius: 12
-  }
 });
