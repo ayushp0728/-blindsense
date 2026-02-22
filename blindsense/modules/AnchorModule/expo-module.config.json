@@ -1,7 +1,7 @@
 {
   "platforms": ["apple", "android", "web"],
   "apple": {
-    "modules": ["AnchorModule"]
+    "modules": ["AnchorModule", "VolumeButtonModule"]
   },
   "android": {
     "modules": ["expo.modules.mymodule.AnchorModule"]

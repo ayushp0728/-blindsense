@@ -72,8 +72,12 @@ final class VolumeButtonManager: NSObject {
     
     deinit {
         observation?.invalidate()
-        DispatchQueue.main.async {
-            self.volumeView.removeFromSuperview()
+        observation = nil
+    
+        DispatchQueue.main.async { [volumeView] in
+            volumeView.removeFromSuperview()
         }
     }
+
+
 }

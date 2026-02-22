@@ -17,7 +17,8 @@
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
-        ]
+        ],
+        "NSMicrophoneUsageDescription": "Blindsense uses the microphone to provide audio guidance and feedback."
       }
     },
     "android": {
